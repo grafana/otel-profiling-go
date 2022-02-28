@@ -1,0 +1,16 @@
+version: "3.7"
+services:
+  client:
+    image: golang:1.17
+    command:
+      - "/bin/sh"
+      - "-c"
+      - "wget http://server:5000"
+    depends_on:
+      - server
+  server:
+    build:
+      context: ''
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
