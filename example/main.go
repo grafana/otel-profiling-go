@@ -50,8 +50,12 @@ func initTracer() *trace.TracerProvider {
 		trace.WithBatcher(exporter),
 	)
 	otel.SetTracerProvider(otelpyroscope.NewTracerProvider(tp,
-		otelpyroscope.WithDefaultProfileURLBuilder("http://localhost:4040", "example-app"),
+		otelpyroscope.WithAppName("example-app"),
+		otelpyroscope.WithPyroscopeURL("http://localhost:4040"),
 		otelpyroscope.WithRootSpanOnly(true),
+		otelpyroscope.WithAddSpanName(true),
+		otelpyroscope.WithProfileURL(true),
+		otelpyroscope.WithProfileBaselineURL(true),
 	))
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
