@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	profileIDLabelName   = "profile_id"
-	profileNameLabelName = "profile_name"
+	profileIDLabelName = "profile_id"
+	spanNameLabelName  = "span_name"
 )
 
 var (
@@ -147,7 +147,7 @@ func NewTracerProvider(tp trace.TracerProvider, options ...Option) trace.TracerP
 func DefaultProfileURLBuilder(addr, app string) func(string) string {
 	return func(id string) string {
 		q := make(url.Values, 1)
-		q.Set("query", app+`.cpu{profile_id="`+id+`"}`)
+		q.Set("query", app+`.cpu{`+profileIDLabelName+`="`+id+`"}`)
 		return addr + "?" + q.Encode()
 	}
 }
@@ -176,7 +176,7 @@ func (w profileTracer) Start(ctx context.Context, spanName string, opts ...trace
 
 	labels := []string{profileIDLabelName, s.profileID}
 	if w.p.config.AddSpanName && spanName != "" {
-		labels = append(labels, profileNameLabelName, spanName)
+		labels = append(labels, spanNameLabelName, spanName)
 	}
 
 	ctx = pprof.WithLabels(ctx, pprof.Labels(labels...))
