@@ -2,6 +2,8 @@ module github.com/pyroscope-io/otelpyroscope/example
 
 go 1.16
 
+replace github.com/pyroscope-io/otelpyroscope => ../
+
 require (
 	github.com/pyroscope-io/otelpyroscope v0.1.0
 	go.opentelemetry.io/otel v1.4.1

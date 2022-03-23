@@ -2,24 +2,128 @@ package otelpyroscope
 
 import (
 	"context"
+	"net/url"
 	"runtime/pprof"
+	"strconv"
+	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
-const profileIDLabelName = "profile_id"
+const (
+	profileIDLabelName   = "profile_id"
+	profileNameLabelName = "profile_name"
+)
 
 var (
-	profileIDSpanAttributeKey  = attribute.Key("pyroscope.profile.id")
-	profileURLSpanAttributeKey = attribute.Key("pyroscope.profile.url")
+	profileIDSpanAttributeKey          = attribute.Key("pyroscope.profile.id")
+	profileURLSpanAttributeKey         = attribute.Key("pyroscope.profile.url")
+	profileBaselineURLSpanAttributeKey = attribute.Key("pyroscope.profile.baseline.url")
 )
+
+type Config struct {
+	AppName                   string
+	PyroscopeURL              string
+	IncludeProfileURL         bool
+	IncludeProfileBaselineURL bool
+	ProfileBaselineLabels     map[string]string
+
+	RootOnly    bool
+	AddSpanName bool
+}
+
+type Option func(*tracerProvider)
+
+// WithAppName specifies the profiled application name.
+// It should match the name specified in pyroscope configuration.
+// Required, if profile URL or profile baseline URL is enabled.
+func WithAppName(app string) Option {
+	return func(tp *tracerProvider) {
+		tp.config.AppName = app
+	}
+}
+
+// WithRootSpanOnly indicates that only the root span is to be profiled.
+// The profile includes samples captured during child span execution
+// but the spans won't have their own profiles and won't be annotated
+// with pyroscope.profile attributes.
+// The option is enabled by default.
+func WithRootSpanOnly(x bool) Option {
+	return func(tp *tracerProvider) {
+		tp.config.RootOnly = x
+	}
+}
+
+// WithAddSpanName specifies whether the current span name should be added
+// to the profile labels. N.B if the name is dynamic, or too many values
+// are supposed, this may significantly deteriorate performance.
+// By default, span name is not added to profile labels.
+func WithAddSpanName(x bool) Option {
+	return func(tp *tracerProvider) {
+		tp.config.AddSpanName = x
+	}
+}
+
+// WithPyroscopeURL provides a base URL for the profile and baseline URLs.
+// Required, if profile URL or profile baseline URL is enabled.
+func WithPyroscopeURL(addr string) Option {
+	return func(tp *tracerProvider) {
+		tp.config.PyroscopeURL = addr
+	}
+}
+
+// WithProfileURL specifies whether to add the pyroscope.profile.url
+// attribute with the URL to the span profile.
+func WithProfileURL(x bool) Option {
+	return func(tp *tracerProvider) {
+		tp.config.IncludeProfileURL = x
+	}
+}
+
+// WithProfileBaselineURL specifies whether to add the
+// pyroscope.profile.baseline.url attribute with the URL
+// to the baseline profile. See WithProfileBaselineLabels.
+func WithProfileBaselineURL(x bool) Option {
+	return func(tp *tracerProvider) {
+		tp.config.IncludeProfileBaselineURL = x
+	}
+}
+
+// WithProfileBaselineLabels provides a map of extra labels to be added to the
+// baseline query alongside with pprof labels set in runtime. Typically,
+// it should match the labels specified in the Pyroscope profiler config.
+// Note that the map must not be modified.
+func WithProfileBaselineLabels(x map[string]string) Option {
+	return func(tp *tracerProvider) {
+		tp.config.ProfileBaselineLabels = x
+	}
+}
+
+// WithProfileURLBuilder specifies how profile URL is to be built.
+// DEPRECATED: use WithProfileURL
+func WithProfileURLBuilder(b func(profileID string) string) Option {
+	return func(tp *tracerProvider) {
+		tp.config.IncludeProfileURL = true
+		tp.buildURL = b
+	}
+}
+
+// WithDefaultProfileURLBuilder specifies the default profile URL builder.
+// DEPRECATED: use WithProfileURL
+func WithDefaultProfileURLBuilder(addr string, app string) Option {
+	return func(tp *tracerProvider) {
+		tp.config.IncludeProfileURL = true
+		tp.buildURL = DefaultProfileURLBuilder(addr, app)
+	}
+}
 
 // tracerProvider satisfies open telemetry TracerProvider interface.
 type tracerProvider struct {
 	tp trace.TracerProvider
 
-	rootOnly bool
+	config   Config
 	buildURL func(string) string
 }
 
@@ -28,68 +132,56 @@ type tracerProvider struct {
 // between pprof profiles and reported tracing spans.
 func NewTracerProvider(tp trace.TracerProvider, options ...Option) trace.TracerProvider {
 	p := tracerProvider{
-		tp:       tp,
-		rootOnly: true,
+		tp:     tp,
+		config: Config{RootOnly: true},
 	}
 	for _, o := range options {
 		o(&p)
 	}
+	if p.config.IncludeProfileURL && p.buildURL == nil {
+		p.buildURL = DefaultProfileURLBuilder(p.config.PyroscopeURL, p.config.AppName)
+	}
 	return &p
 }
 
-type Option func(*tracerProvider)
-
-// WithRootSpanOnly indicates that only the root span is to be profiled.
-// The profile includes samples captured during child span execution
-// but the spans won't have their own profiles and won't be annotated
-// with pyroscope.profile attributes.
-func WithRootSpanOnly(rootOnly bool) Option {
-	return func(tp *tracerProvider) {
-		tp.rootOnly = rootOnly
-	}
-}
-
-// WithProfileURLBuilder specifies how profile URL is to be built. Optional.
-func WithProfileURLBuilder(b func(profileID string) string) Option {
-	return func(tp *tracerProvider) {
-		tp.buildURL = b
-	}
-}
-
-func WithDefaultProfileURLBuilder(addr string, app string) Option {
-	return func(tp *tracerProvider) {
-		tp.buildURL = DefaultProfileURLBuilder(addr, app)
-	}
-}
-
-func DefaultProfileURLBuilder(addr string, app string) func(string) string {
+func DefaultProfileURLBuilder(addr, app string) func(string) string {
 	return func(id string) string {
-		return addr + "?query=" + app + ".cpu%7Bprofile_id%3D%22" + id + "%22%7D"
+		q := make(url.Values, 1)
+		q.Set("query", app+`.cpu{profile_id="`+id+`"}`)
+		return addr + "?" + q.Encode()
 	}
 }
 
-func (w tracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.Tracer {
+func (w *tracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.Tracer {
 	return &profileTracer{p: w, tr: w.tp.Tracer(name, opts...)}
 }
 
 type profileTracer struct {
-	p  tracerProvider
+	p  *tracerProvider
 	tr trace.Tracer
 }
 
 func (w profileTracer) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	if w.p.rootOnly && !isRootSpan(trace.SpanContextFromContext(ctx)) {
+	if w.p.config.RootOnly && !isRootSpan(trace.SpanContextFromContext(ctx)) {
 		return w.tr.Start(ctx, spanName, opts...)
 	}
 	ctx, span := w.tr.Start(ctx, spanName, opts...)
 	s := spanWrapper{
-		profileID: trace.SpanContextFromContext(ctx).SpanID().String(),
 		Span:      span,
+		profileID: trace.SpanContextFromContext(ctx).SpanID().String(),
+		startTime: time.Now(),
 		ctx:       ctx,
 		p:         w.p,
 	}
-	ctx = pprof.WithLabels(ctx, pprof.Labels(profileIDLabelName, s.profileID))
+
+	labels := []string{profileIDLabelName, s.profileID}
+	if w.p.config.AddSpanName && spanName != "" {
+		labels = append(labels, profileNameLabelName, spanName)
+	}
+
+	ctx = pprof.WithLabels(ctx, pprof.Labels(labels...))
 	pprof.SetGoroutineLabels(ctx)
+	s.pprofCtx = ctx
 	return ctx, &s
 }
 
@@ -101,10 +193,15 @@ func isRootSpan(s trace.SpanContext) bool {
 
 type spanWrapper struct {
 	trace.Span
-	ctx context.Context
 
+	// Span context.
+	ctx context.Context
+	// Current pprof context with labels.
+	pprofCtx  context.Context
 	profileID string
-	p         tracerProvider
+	startTime time.Time
+
+	p *tracerProvider
 }
 
 func (s spanWrapper) End(options ...trace.SpanEndOption) {
@@ -114,9 +211,59 @@ func (s spanWrapper) End(options ...trace.SpanEndOption) {
 	// scope that is associated with a tracing span.
 	s.SetAttributes(profileIDSpanAttributeKey.String(s.profileID))
 	// Optionally specify the profile URL.
-	if s.p.buildURL != nil {
+	if s.p.config.IncludeProfileURL {
 		s.SetAttributes(profileURLSpanAttributeKey.String(s.p.buildURL(s.profileID)))
+	}
+	if s.p.config.IncludeProfileBaselineURL {
+		s.SetAttributes(profileBaselineURLSpanAttributeKey.String(s.buildProfileBaselineURL()))
 	}
 	s.Span.End(options...)
 	pprof.SetGoroutineLabels(s.ctx)
+}
+
+func (s spanWrapper) buildProfileBaselineURL() string {
+	var b strings.Builder
+	pprof.ForLabels(s.pprofCtx, func(key, value string) bool {
+		if key == profileIDLabelName {
+			return true
+		}
+		if s.p.config.ProfileBaselineLabels != nil {
+			if _, ok := s.p.config.ProfileBaselineLabels[key]; ok {
+				return true
+			}
+		}
+		writeLabel(&b, key, value)
+		return true
+	})
+	for key, value := range s.p.config.ProfileBaselineLabels {
+		if value != "" {
+			writeLabel(&b, key, value)
+		}
+	}
+
+	q := make(url.Values, 9)
+	from := strconv.FormatInt(s.startTime.Unix(), 10)
+	until := strconv.FormatInt(time.Now().Unix(), 10)
+	baselineQuery := s.p.config.AppName + `.cpu{` + b.String() + `}`
+
+	q.Set("query", baselineQuery)
+	q.Set("from", from)
+	q.Set("until", until)
+
+	q.Set("rightQuery", s.p.config.AppName+`.cpu{`+profileIDLabelName+`="`+s.profileID+`"}`)
+	q.Set("rightFrom", from)
+	q.Set("rightUntil", until)
+
+	q.Set("leftQuery", baselineQuery)
+	q.Set("leftFrom", from)
+	q.Set("leftUntil", until)
+
+	return s.p.config.PyroscopeURL + "/comparison?" + q.Encode()
+}
+
+func writeLabel(b *strings.Builder, k, v string) {
+	if b.Len() > 0 {
+		b.WriteByte(',')
+	}
+	b.WriteString(k + `="` + v + `"`)
 }
