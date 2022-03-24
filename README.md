@@ -1,5 +1,7 @@
 # Profiling Instrumentation
 
+**NOTE**: Tracing integration is supported in [Pyroscope](https://pyroscope.io) starting from v0.14.0.
+
 The package provides means to integrate tracing with profiling. More specifically, a `TracerProvider` implementation,
 that annotates profiling data with span IDs: when a new trace span emerges, the tracer adds a `profile_id` [pprof tag](https://github.com/google/pprof/blob/master/doc/README.md#tag-filtering)
 that points to the span. This makes it possible to filter out a profile of a particular trace span in [Pyroscope](https://pyroscope.io).
