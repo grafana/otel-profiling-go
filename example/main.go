@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/pyroscope-io/client/pyroscope"
 	"github.com/pyroscope-io/otelpyroscope"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
@@ -14,13 +15,23 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
+const (
+	appName           = "example-app"
+	pyroscopeEndpoint = "http://localhost:4040"
+)
+
 func main() {
-	tp := initTracer()
+	tp := initTracer(appName, pyroscopeEndpoint)
 	defer func() {
 		if err := tp.Shutdown(context.Background()); err != nil {
 			log.Printf("Error shutting down tracer provider: %v", err)
 		}
 	}()
+
+	_, _ = pyroscope.Start(pyroscope.Config{
+		ApplicationName: appName,
+		ServerAddress:   pyroscopeEndpoint,
+	})
 
 	err := http.ListenAndServe(":5000", http.HandlerFunc(cpuBoundHandler))
 	if !errors.Is(err, http.ErrServerClosed) {
@@ -40,7 +51,7 @@ func cpuBoundHandler(_ http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func initTracer() *trace.TracerProvider {
+func initTracer(appName, pyroscopeEndpoint string) *trace.TracerProvider {
 	exporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
 	if err != nil {
 		log.Fatal(err)
@@ -50,8 +61,8 @@ func initTracer() *trace.TracerProvider {
 		trace.WithBatcher(exporter),
 	)
 	otel.SetTracerProvider(otelpyroscope.NewTracerProvider(tp,
-		otelpyroscope.WithAppName("example-app"),
-		otelpyroscope.WithPyroscopeURL("http://localhost:4040"),
+		otelpyroscope.WithAppName(appName),
+		otelpyroscope.WithPyroscopeURL(pyroscopeEndpoint),
 		otelpyroscope.WithRootSpanOnly(true),
 		otelpyroscope.WithAddSpanName(true),
 		otelpyroscope.WithProfileURL(true),

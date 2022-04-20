@@ -21,6 +21,7 @@ var (
 	profileIDSpanAttributeKey          = attribute.Key("pyroscope.profile.id")
 	profileURLSpanAttributeKey         = attribute.Key("pyroscope.profile.url")
 	profileBaselineURLSpanAttributeKey = attribute.Key("pyroscope.profile.baseline.url")
+	profileDiffURLSpanAttributeKey     = attribute.Key("pyroscope.profile.diff.url")
 )
 
 type Config struct {
@@ -215,13 +216,13 @@ func (s spanWrapper) End(options ...trace.SpanEndOption) {
 		s.SetAttributes(profileURLSpanAttributeKey.String(s.p.buildURL(s.profileID)))
 	}
 	if s.p.config.IncludeProfileBaselineURL {
-		s.SetAttributes(profileBaselineURLSpanAttributeKey.String(s.buildProfileBaselineURL()))
+		s.setBaselineURLs()
 	}
 	s.Span.End(options...)
 	pprof.SetGoroutineLabels(s.ctx)
 }
 
-func (s spanWrapper) buildProfileBaselineURL() string {
+func (s spanWrapper) setBaselineURLs() {
 	var b strings.Builder
 	pprof.ForLabels(s.pprofCtx, func(key, value string) bool {
 		if key == profileIDLabelName {
@@ -258,7 +259,9 @@ func (s spanWrapper) buildProfileBaselineURL() string {
 	q.Set("leftFrom", from)
 	q.Set("leftUntil", until)
 
-	return s.p.config.PyroscopeURL + "/comparison?" + q.Encode()
+	qs := q.Encode()
+	s.SetAttributes(profileBaselineURLSpanAttributeKey.String(s.p.config.PyroscopeURL + "/comparison?" + qs))
+	s.SetAttributes(profileDiffURLSpanAttributeKey.String(s.p.config.PyroscopeURL + "/comparison-diff?" + qs))
 }
 
 func writeLabel(b *strings.Builder, k, v string) {
