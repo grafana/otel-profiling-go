@@ -14,6 +14,11 @@ You can find a full Honeycomb example in the [example](/example) directory or in
 You can find a full Jaeger example (with custom Jaeger UI) in the [tracing/jaeger](https://github.com/pyroscope-io/pyroscope/tree/main/examples/tracing/jaeger) folder in the Pyroscope repository.
 ![image](https://user-images.githubusercontent.com/23323466/164025573-1f6e713b-ec94-4d82-842c-faf2be652b7f.png)
 
+#### Baseline Diffs
+We also added functionality where each individual span is compared to a baseline of spans with similar properties and the diff can be shown in the UI:
+
+
+[![Watch the video](https://user-images.githubusercontent.com/23323466/165633049-9591b0fd-b8be-4fbd-a0af-d90a1dd89b7b.mov)](https://user-images.githubusercontent.com/23323466/165633049-9591b0fd-b8be-4fbd-a0af-d90a1dd89b7b.mov)
 
 
 ### Other Notes
