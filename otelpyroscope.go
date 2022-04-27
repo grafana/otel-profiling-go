@@ -243,7 +243,7 @@ func (s spanWrapper) setBaselineURLs() {
 	}
 
 	q := make(url.Values, 9)
-	from := strconv.FormatInt(s.startTime.Unix(), 10)
+	from := strconv.FormatInt(s.startTime.Unix()-3600, 10)
 	until := strconv.FormatInt(time.Now().Unix(), 10)
 	baselineQuery := s.p.config.AppName + `.cpu{` + b.String() + `}`
 
