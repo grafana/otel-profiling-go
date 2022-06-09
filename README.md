@@ -17,8 +17,13 @@ You can find a full Jaeger example (with custom Jaeger UI) in the [tracing/jaege
 #### Baseline Diffs
 We also added functionality where each individual span is compared to a baseline of spans with similar properties and the diff can be shown in the UI:
 
-
 [![Watch the video](https://user-images.githubusercontent.com/23323466/165633049-9591b0fd-b8be-4fbd-a0af-d90a1dd89b7b.mov)](https://user-images.githubusercontent.com/23323466/165633049-9591b0fd-b8be-4fbd-a0af-d90a1dd89b7b.mov)
+
+
+### Grafana Example
+For another example of what this package allows you to do you can see with Grafana the ability to link between logs, traces and profiles in the following video ([source](https://github.com/pyroscope-io/pyroscope/tree/main/examples/tracing/jaeger)):
+
+[![Watch the video](https://user-images.githubusercontent.com/23323466/172881613-842f67f0-6bfa-4671-a44a-e966d5ca67a4.mov)](https://user-images.githubusercontent.com/23323466/172881613-842f67f0-6bfa-4671-a44a-e966d5ca67a4.mov)
 
 
 ### Other Notes
