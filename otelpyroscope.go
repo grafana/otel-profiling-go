@@ -104,28 +104,24 @@ func WithProfileBaselineLabels(x map[string]string) Option {
 
 // WithProfileURLBuilder specifies how profile URL is to be built.
 // DEPRECATED: use WithProfileURL
-func WithProfileURLBuilder(b func(profileID string) string) Option {
+func WithProfileURLBuilder(b func(_ string) string) Option {
 	return func(tp *tracerProvider) {
 		tp.config.IncludeProfileURL = true
-		tp.buildURL = b
 	}
 }
 
 // WithDefaultProfileURLBuilder specifies the default profile URL builder.
 // DEPRECATED: use WithProfileURL
-func WithDefaultProfileURLBuilder(addr string, app string) Option {
+func WithDefaultProfileURLBuilder(_, _ string) Option {
 	return func(tp *tracerProvider) {
 		tp.config.IncludeProfileURL = true
-		tp.buildURL = DefaultProfileURLBuilder(addr, app)
 	}
 }
 
 // tracerProvider satisfies open telemetry TracerProvider interface.
 type tracerProvider struct {
-	tp trace.TracerProvider
-
-	config   Config
-	buildURL func(string) string
+	tp     trace.TracerProvider
+	config Config
 }
 
 // NewTracerProvider creates a new tracer provider that annotates pprof
@@ -139,18 +135,7 @@ func NewTracerProvider(tp trace.TracerProvider, options ...Option) trace.TracerP
 	for _, o := range options {
 		o(&p)
 	}
-	if p.config.IncludeProfileURL && p.buildURL == nil {
-		p.buildURL = DefaultProfileURLBuilder(p.config.PyroscopeURL, p.config.AppName)
-	}
 	return &p
-}
-
-func DefaultProfileURLBuilder(addr, app string) func(string) string {
-	return func(id string) string {
-		q := make(url.Values, 1)
-		q.Set("query", app+`.cpu{`+profileIDLabelName+`="`+id+`"}`)
-		return addr + "?" + q.Encode()
-	}
 }
 
 func (w *tracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.Tracer {
@@ -213,13 +198,23 @@ func (s spanWrapper) End(options ...trace.SpanEndOption) {
 	s.SetAttributes(profileIDSpanAttributeKey.String(s.profileID))
 	// Optionally specify the profile URL.
 	if s.p.config.IncludeProfileURL {
-		s.SetAttributes(profileURLSpanAttributeKey.String(s.p.buildURL(s.profileID)))
+		s.setProfileURL()
 	}
 	if s.p.config.IncludeProfileBaselineURL {
 		s.setBaselineURLs()
 	}
 	s.Span.End(options...)
 	pprof.SetGoroutineLabels(s.ctx)
+}
+
+func (s spanWrapper) setProfileURL() {
+	q := make(url.Values, 3)
+	from := strconv.FormatInt(s.startTime.UnixNano(), 10)
+	until := strconv.FormatInt(time.Now().UnixNano(), 10)
+	q.Set("query", s.p.config.AppName+`.cpu{`+profileIDLabelName+`="`+s.profileID+`"}`)
+	q.Set("from", from)
+	q.Set("until", until)
+	s.SetAttributes(profileURLSpanAttributeKey.String(s.p.config.PyroscopeURL + "/?" + q.Encode()))
 }
 
 func (s spanWrapper) setBaselineURLs() {
