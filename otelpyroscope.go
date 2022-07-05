@@ -209,8 +209,8 @@ func (s spanWrapper) End(options ...trace.SpanEndOption) {
 
 func (s spanWrapper) setProfileURL() {
 	q := make(url.Values, 3)
-	from := strconv.FormatInt(s.startTime.Unix(), 10)
-	until := strconv.FormatInt(time.Now().Unix(), 10)
+	from := strconv.FormatInt(s.startTime.UnixNano(), 10)
+	until := strconv.FormatInt(time.Now().UnixNano(), 10)
 	q.Set("query", s.p.config.AppName+`.cpu{`+profileIDLabelName+`="`+s.profileID+`"}`)
 	q.Set("from", from)
 	q.Set("until", until)
