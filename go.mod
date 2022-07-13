@@ -1,4 +1,4 @@
-module github.com/pyroscope-io/otelpyroscope
+module github.com/pyroscope-io/otel-profiling-go
 
 go 1.16
 
