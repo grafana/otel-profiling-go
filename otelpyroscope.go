@@ -238,20 +238,20 @@ func (s spanWrapper) setBaselineURLs() {
 	}
 
 	q := make(url.Values, 9)
-	from := strconv.FormatInt(s.startTime.Unix()-3600, 10)
-	until := strconv.FormatInt(time.Now().Unix(), 10)
 	baselineQuery := s.p.config.AppName + `.cpu{` + b.String() + `}`
+	baselineFrom := strconv.FormatInt(s.startTime.Add(-time.Hour).UnixNano(), 10)
+	until := strconv.FormatInt(time.Now().UnixNano(), 10)
 
 	q.Set("query", baselineQuery)
-	q.Set("from", from)
+	q.Set("from", baselineFrom)
 	q.Set("until", until)
 
 	q.Set("rightQuery", s.p.config.AppName+`.cpu{`+profileIDLabelName+`="`+s.profileID+`"}`)
-	q.Set("rightFrom", from)
+	q.Set("rightFrom", strconv.FormatInt(s.startTime.UnixNano(), 10))
 	q.Set("rightUntil", until)
 
 	q.Set("leftQuery", baselineQuery)
-	q.Set("leftFrom", from)
+	q.Set("leftFrom", baselineFrom)
 	q.Set("leftUntil", until)
 
 	qs := q.Encode()
