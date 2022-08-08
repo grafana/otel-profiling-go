@@ -9,3 +9,5 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.4.1
 	go.opentelemetry.io/otel/sdk v1.4.1
 )
+
+replace github.com/pyroscope-io/otel-profiling-go => ../
