@@ -148,7 +148,8 @@ type profileTracer struct {
 }
 
 func (w profileTracer) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	if w.p.config.RootOnly && !isRootSpan(trace.SpanContextFromContext(ctx)) {
+	spanCtx := trace.SpanContextFromContext(ctx)
+	if !spanCtx.IsSampled() || w.p.config.RootOnly && !isRootSpan(spanCtx) {
 		return w.tr.Start(ctx, spanName, opts...)
 	}
 	ctx, span := w.tr.Start(ctx, spanName, opts...)
