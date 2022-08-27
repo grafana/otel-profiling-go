@@ -148,21 +148,29 @@ type profileTracer struct {
 }
 
 func (w profileTracer) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	if w.p.config.RootOnly && !isRootSpan(trace.SpanContextFromContext(ctx)) {
-		return w.tr.Start(ctx, spanName, opts...)
-	}
+	isRoot := isRootSpan(trace.SpanContextFromContext(ctx))
 	ctx, span := w.tr.Start(ctx, spanName, opts...)
+	if w.p.config.RootOnly && !isRoot {
+		return ctx, span
+	}
+
 	s := spanWrapper{
 		Span:      span,
-		profileID: trace.SpanContextFromContext(ctx).SpanID().String(),
+		profileID: span.SpanContext().SpanID().String(),
 		startTime: time.Now(),
 		ctx:       ctx,
 		p:         w.p,
 	}
 
-	labels := []string{profileIDLabelName, s.profileID}
+	// Regardless of whether a span is sampled ot not, if configured,
+	// span_name pprof tag should be set to ensure profile consistency.
+	labels := make([]string, 0, 4)
 	if w.p.config.AddSpanName && spanName != "" {
 		labels = append(labels, spanNameLabelName, spanName)
+	}
+	if span.SpanContext().IsSampled() && s.profileID != "" {
+		// Set profile_id pprof tag only if the span is sampled.
+		labels = append(labels, profileIDLabelName, s.profileID)
 	}
 
 	ctx = pprof.WithLabels(ctx, pprof.Labels(labels...))

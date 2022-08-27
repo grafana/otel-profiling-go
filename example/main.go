@@ -7,12 +7,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pyroscope-io/client/pyroscope"
-	otelpyroscope "github.com/pyroscope-io/otel-profiling-go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/pyroscope-io/client/pyroscope"
+	"github.com/pyroscope-io/otel-profiling-go"
 )
 
 const (
@@ -31,15 +32,17 @@ func main() {
 	_, _ = pyroscope.Start(pyroscope.Config{
 		ApplicationName: appName,
 		ServerAddress:   pyroscopeEndpoint,
+		Logger:          pyroscope.StandardLogger,
 	})
 
+	log.Println("starting listening")
 	err := http.ListenAndServe(":5000", http.HandlerFunc(cpuBoundHandler))
 	if !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
 }
 
-func cpuBoundHandler(_ http.ResponseWriter, r *http.Request) {
+func cpuBoundHandler(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.GetTracerProvider().Tracer("")
 	_, span := tracer.Start(r.Context(), "cpuBoundHandler")
 	defer span.End()
