@@ -1,14 +1,10 @@
 # Profiling Instrumentation
 
-**NOTE**: Tracing integration is supported in [Pyroscope](https://pyroscope.io) starting from v0.14.0.
+**NOTE**: This is an experimental package -- and will be officially supported in future versions of Pyroscope
 
 The package provides means to integrate tracing with profiling. More specifically, a `TracerProvider` implementation,
 that annotates profiling data with span IDs: when a new trace span emerges, the tracer adds a `profile_id` [pprof tag](https://github.com/google/pprof/blob/master/doc/README.md#tag-filtering)
 that points to the span. This makes it possible to filter out a profile of a particular trace span in [Pyroscope](https://pyroscope.io).
-
-### Honeycomb Example
-You can find a full Honeycomb example in the [example](/example) directory or in the [Pyroscope repository](https://github.com/pyroscope-io/pyroscope/tree/main/examples/tracing).
-
 
 ### Jaeger Example
 You can find a full Jaeger example (with custom Jaeger UI) in the [tracing/jaeger](https://github.com/pyroscope-io/pyroscope/tree/main/examples/tracing/jaeger) folder in the Pyroscope repository.
