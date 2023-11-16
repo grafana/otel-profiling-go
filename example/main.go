@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/grafana/pyroscope-go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/trace"
 
-	"github.com/pyroscope-io/client/pyroscope"
 	"github.com/pyroscope-io/otel-profiling-go"
 )
 
