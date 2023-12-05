@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -13,26 +12,20 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/trace"
 
-	"github.com/pyroscope-io/otel-profiling-go"
-)
-
-const (
-	appName           = "example-app"
-	pyroscopeEndpoint = "http://localhost:4040"
+	otelpyroscope "github.com/grafana/otel-profiling-go"
 )
 
 func main() {
-	tp := initTracer(appName, pyroscopeEndpoint)
-	defer func() {
-		if err := tp.Shutdown(context.Background()); err != nil {
-			log.Printf("Error shutting down tracer provider: %v", err)
-		}
-	}()
+	// Initialize your tracer provider as usual.
+	tp := initTracer()
 
+	// Wrap it with otelpyroscope tracer provider.
+	otel.SetTracerProvider(otelpyroscope.NewTracerProvider(tp))
+
+	// Initialize pyroscope profiler.
 	_, _ = pyroscope.Start(pyroscope.Config{
-		ApplicationName: appName,
-		ServerAddress:   pyroscopeEndpoint,
-		Logger:          pyroscope.StandardLogger,
+		ApplicationName: "my-service",
+		ServerAddress:   "http://localhost:4040",
 	})
 
 	log.Println("starting listening")
@@ -42,7 +35,7 @@ func main() {
 	}
 }
 
-func cpuBoundHandler(w http.ResponseWriter, r *http.Request) {
+func cpuBoundHandler(_ http.ResponseWriter, r *http.Request) {
 	tracer := otel.GetTracerProvider().Tracer("")
 	_, span := tracer.Start(r.Context(), "cpuBoundHandler")
 	defer span.End()
@@ -54,7 +47,7 @@ func cpuBoundHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func initTracer(appName, pyroscopeEndpoint string) *trace.TracerProvider {
+func initTracer() *trace.TracerProvider {
 	exporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
 	if err != nil {
 		log.Fatal(err)
@@ -63,14 +56,6 @@ func initTracer(appName, pyroscopeEndpoint string) *trace.TracerProvider {
 		trace.WithSampler(trace.AlwaysSample()),
 		trace.WithBatcher(exporter),
 	)
-	otel.SetTracerProvider(otelpyroscope.NewTracerProvider(tp,
-		otelpyroscope.WithAppName(appName),
-		otelpyroscope.WithPyroscopeURL(pyroscopeEndpoint),
-		otelpyroscope.WithRootSpanOnly(true),
-		otelpyroscope.WithAddSpanName(true),
-		otelpyroscope.WithProfileURL(true),
-		otelpyroscope.WithProfileBaselineURL(true),
-	))
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
