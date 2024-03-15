@@ -1,7 +1,5 @@
 # Profiling Instrumentation for OpenTelemetry Go SDK
 
-**NOTE**: This is an experimental package -- and will be officially supported in future versions of Pyroscope
-
 The package provides means to integrate tracing with profiling. More specifically, a `TracerProvider` implementation,
 that annotates profiling data with span IDs: when a new trace span emerges, the tracer adds a `span_id` [pprof tag](https://github.com/google/pprof/blob/master/doc/README.md#tag-filtering)
 that points to the span. This makes it possible to filter out a profile of a particular trace span in [Pyroscope](https://pyroscope.io).
