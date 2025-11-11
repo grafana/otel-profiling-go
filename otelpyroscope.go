@@ -12,6 +12,7 @@ import (
 const (
 	spanIDLabelName   = "span_id"
 	spanNameLabelName = "span_name"
+	traceIDLabelName  = "trace_id"
 )
 
 var profileIDSpanAttributeKey = attribute.Key("pyroscope.profile.id")
@@ -24,8 +25,9 @@ type tracerProvider struct {
 }
 
 type config struct {
-	spanNameScope scope
-	spanIDScope   scope
+	spanNameScope   scope
+	spanIDScope     scope
+	addTraceIDLabel bool
 }
 
 type Option func(*tracerProvider)
@@ -62,11 +64,13 @@ func (w *profileTracer) Start(ctx context.Context, spanName string, opts ...trac
 	spanCtx := span.SpanContext()
 	addSpanIDLabel := w.p.config.spanIDScope != scopeNone && spanCtx.IsSampled()
 	addSpanNameLabel := w.p.config.spanNameScope != scopeNone && spanName != ""
-	if !(addSpanIDLabel || addSpanNameLabel) {
+	addTraceIDLabel := w.p.config.addTraceIDLabel && spanCtx.TraceID().IsValid()
+	if !(addSpanIDLabel || addSpanNameLabel || addTraceIDLabel) {
 		return ctx, span
 	}
 
 	spanID := spanCtx.SpanID().String()
+	traceID := spanCtx.TraceID().String()
 	s := spanWrapper{
 		Span: span,
 		ctx:  ctx,
@@ -76,8 +80,9 @@ func (w *profileTracer) Start(ctx context.Context, spanName string, opts ...trac
 	rs, ok := rootSpanFromContext(ctx)
 	if !ok {
 		// This is the first local span.
-		rs.id = spanID
-		rs.name = spanName
+		rs.spanID = spanID
+		rs.spanName = spanName
+		rs.traceID = traceID
 		ctx = withRootSpan(ctx, rs)
 	}
 
@@ -85,22 +90,28 @@ func (w *profileTracer) Start(ctx context.Context, spanName string, opts ...trac
 	// only if they _can_ have profiles. Presence of the attribute
 	// does not indicate the fact that we actually have collected
 	// any samples for the span.
-	if (w.p.config.spanIDScope == scopeRootSpan && spanID == rs.id) ||
+	if (w.p.config.spanIDScope == scopeRootSpan && spanID == rs.spanID) ||
 		w.p.config.spanIDScope == scopeAllSpans {
 		span.SetAttributes(profileIDSpanAttributeKey.String(spanID))
 	}
-	labels := make([]string, 0, 4)
+	labels := make([]string, 0, 6)
 	if addSpanNameLabel {
 		if w.p.config.spanNameScope == scopeRootSpan {
-			spanName = rs.name
+			spanName = rs.spanName
 		}
 		labels = append(labels, spanNameLabelName, spanName)
 	}
 	if addSpanIDLabel {
 		if w.p.config.spanIDScope == scopeRootSpan {
-			spanID = rs.id
+			spanID = rs.spanID
 		}
 		labels = append(labels, spanIDLabelName, spanID)
+	}
+	if addTraceIDLabel {
+		if rs.traceID != "" {
+			traceID = rs.traceID
+		}
+		labels = append(labels, traceIDLabelName, traceID)
 	}
 
 	ctx = pprof.WithLabels(ctx, pprof.Labels(labels...))
@@ -122,8 +133,9 @@ func (s spanWrapper) End(options ...trace.SpanEndOption) {
 type rootSpanCtxKey struct{}
 
 type rootSpan struct {
-	id   string
-	name string
+	spanID   string
+	spanName string
+	traceID  string
 }
 
 func withRootSpan(ctx context.Context, s rootSpan) context.Context {
@@ -133,6 +145,14 @@ func withRootSpan(ctx context.Context, s rootSpan) context.Context {
 func rootSpanFromContext(ctx context.Context) (rootSpan, bool) {
 	s, ok := ctx.Value(rootSpanCtxKey{}).(rootSpan)
 	return s, ok
+}
+
+// WithTraceID specifies that the span trace ID should be added to the profile
+// labels when available.
+func WithTraceID() Option {
+	return func(tp *tracerProvider) {
+		tp.config.addTraceIDLabel = true
+	}
 }
 
 // TODO(kolesnikovae): Make options public.

@@ -67,3 +67,83 @@ func Test_tracerProvider(t *testing.T) {
 	})
 	spanC.End()
 }
+
+func Test_tracerProvider_WithTraceID(t *testing.T) {
+	otel.SetTracerProvider(NewTracerProvider(trace.NewTracerProvider(), WithTraceID()))
+
+	tracer := otel.Tracer("")
+	labels := make(map[string]string)
+
+	ctx, spanR := tracer.Start(context.Background(), "RootSpan")
+	pprof.ForLabels(ctx, func(key, value string) bool {
+		labels[key] = value
+		return true
+	})
+
+	// Verify span_id is present
+	spanID, ok := labels[spanIDLabelName]
+	if !ok {
+		t.Fatal("span ID label not found")
+	}
+	if len(spanID) != 16 {
+		t.Fatalf("invalid span ID: %q", spanID)
+	}
+
+	// Verify span_name is present
+	name, ok := labels[spanNameLabelName]
+	if !ok {
+		t.Fatal("span name label not found")
+	}
+	if name != "RootSpan" {
+		t.Fatalf("invalid span name: %q", name)
+	}
+
+	// Verify trace_id is present
+	traceID, ok := labels[traceIDLabelName]
+	if !ok {
+		t.Fatal("trace ID label not found")
+	}
+	if len(traceID) != 32 {
+		t.Fatalf("invalid trace ID length: expected 32, got %d for %q", len(traceID), traceID)
+	}
+
+	// Nested child span should have the same trace_id
+	ctx, spanA := tracer.Start(ctx, "SpanA")
+	childLabels := make(map[string]string)
+	pprof.ForLabels(ctx, func(key, value string) bool {
+		childLabels[key] = value
+		return true
+	})
+
+	childTraceID, ok := childLabels[traceIDLabelName]
+	if !ok {
+		t.Fatal("trace ID label not found in child span")
+	}
+	if childTraceID != traceID {
+		t.Fatalf("child span trace ID mismatch: expected %q, got %q", traceID, childTraceID)
+	}
+
+	spanA.End()
+	spanR.End()
+
+	// A new root span should have a different trace_id
+	ctx, spanB := tracer.Start(context.Background(), "SpanB")
+	newLabels := make(map[string]string)
+	pprof.ForLabels(ctx, func(key, value string) bool {
+		newLabels[key] = value
+		return true
+	})
+
+	newTraceID, ok := newLabels[traceIDLabelName]
+	if !ok {
+		t.Fatal("trace ID label not found in new root span")
+	}
+	if newTraceID == traceID {
+		t.Fatalf("new root span should have different trace ID, but got same: %q", newTraceID)
+	}
+	if len(newTraceID) != 32 {
+		t.Fatalf("invalid trace ID length: expected 32, got %d for %q", len(newTraceID), newTraceID)
+	}
+
+	spanB.End()
+}
