@@ -1,8 +1,6 @@
 module github.com/grafana/otel-profiling-go
 
-go 1.25.0
-
-toolchain go1.25.10
+go 1.25.11
 
 require (
 	go.opentelemetry.io/otel v1.43.0
