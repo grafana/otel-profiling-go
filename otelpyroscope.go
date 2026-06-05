@@ -25,9 +25,8 @@ type tracerProvider struct {
 }
 
 type config struct {
-	spanNameScope  Scope
-	spanIDScope    Scope
-	traceIDEnabled bool
+	spanNameScope Scope
+	spanIDScope   Scope
 }
 
 type Option func(*tracerProvider)
@@ -38,9 +37,8 @@ func NewTracerProvider(tp trace.TracerProvider, options ...Option) trace.TracerP
 	p := tracerProvider{
 		tp: tp,
 		config: config{
-			spanNameScope:  ScopeRootSpan,
-			spanIDScope:    ScopeRootSpan,
-			traceIDEnabled: true,
+			spanNameScope: ScopeRootSpan,
+			spanIDScope:   ScopeRootSpan,
 		},
 	}
 	for _, o := range options {
@@ -64,7 +62,7 @@ func (w *profileTracer) Start(ctx context.Context, spanName string, opts ...trac
 	spanCtx := span.SpanContext()
 	addSpanIDLabel := w.p.config.spanIDScope != ScopeNone && spanCtx.IsSampled()
 	addSpanNameLabel := w.p.config.spanNameScope != ScopeNone && spanName != ""
-	addTraceIDLabel := w.p.config.traceIDEnabled && spanCtx.IsSampled()
+	addTraceIDLabel := spanCtx.IsSampled()
 	if !(addSpanIDLabel || addSpanNameLabel || addTraceIDLabel) {
 		return ctx, span
 	}
@@ -141,14 +139,6 @@ func withRootSpan(ctx context.Context, s rootSpan) context.Context {
 func rootSpanFromContext(ctx context.Context) (rootSpan, bool) {
 	s, ok := ctx.Value(rootSpanCtxKey{}).(rootSpan)
 	return s, ok
-}
-
-// WithTraceIDLabel controls whether the "trace_id" pprof label is emitted.
-// Defaults to true.
-func WithTraceIDLabel(enabled bool) Option {
-	return func(tp *tracerProvider) {
-		tp.config.traceIDEnabled = enabled
-	}
 }
 
 // WithSpanNameLabelScope specifies whether the current span name should be

@@ -20,7 +20,6 @@ Limitations:
 
 ## Options
 
-- `WithTraceIDLabel(bool)` — enable/disable the `trace_id` pprof label. Default `true`.
 - `WithSpanIDLabelScope(Scope)` — control whether the `span_id` label is emitted: `ScopeNone` (off),
   `ScopeRootSpan` (default — local root only, descendants inherit the root's value), or `ScopeAllSpans`
   (every span emits its own). `ScopeAllSpans` significantly increases label cardinality.

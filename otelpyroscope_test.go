@@ -106,27 +106,6 @@ func Test_traceIDLabel_defaultEnabled(t *testing.T) {
 	root.End()
 }
 
-func Test_traceIDLabel_disabled(t *testing.T) {
-	tracer := NewTracerProvider(
-		trace.NewTracerProvider(),
-		WithTraceIDLabel(false),
-	).Tracer("")
-
-	ctx, span := tracer.Start(context.Background(), "Root")
-	defer span.End()
-
-	labels := collectLabels(ctx)
-	if v, ok := labels[traceIDLabelName]; ok {
-		t.Fatalf("trace_id should be absent, got %q", v)
-	}
-	if _, ok := labels[spanIDLabelName]; !ok {
-		t.Fatal("span_id should still be present")
-	}
-	if _, ok := labels[spanNameLabelName]; !ok {
-		t.Fatal("span_name should still be present")
-	}
-}
-
 func Test_traceIDLabel_unsampledSpan(t *testing.T) {
 	tp := trace.NewTracerProvider(trace.WithSampler(trace.NeverSample()))
 	tracer := NewTracerProvider(tp).Tracer("")
